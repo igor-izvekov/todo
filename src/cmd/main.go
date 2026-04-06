@@ -24,13 +24,23 @@ func run_http_server() {
 		c.HTML(http.StatusOK, "index.html", gin.H{})
 	})
 
+	taskGroup := router.Group("/tasks")
+
+	{
+		taskGroup.POST("/", handlers.CreateTask)
+		taskGroup.GET("/", handlers.GetTasks)
+		taskGroup.GET("/:id", handlers.GetTask)
+		taskGroup.PUT("/:id", handlers.UpdateTask)
+		taskGroup.DELETE("/:id", handlers.DeleteTask)
+		taskGroup.PATCH("/:id/complete", handlers.CompleteTask)
+	}
+
 	if err := router.Run(http_server); err != nil {
 		log.Fatal("Failed to run server:", err)
 	}
 }
 
 func main() {
-
 	if err := database.Connect("todo.db"); err != nil {
 		panic(err)
 	}
