@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/igor-izvekov/todo/pkg/database"
+	"github.com/igor-izvekov/todo/pkg/migrations"
 )
 
 var (
@@ -28,5 +30,14 @@ func run_http_server() {
 }
 
 func main() {
+
+	if err := database.Connect("todo.db"); err != nil {
+		panic(err)
+	}
+
+	db := database.GetDB()
+	if err := migrations.AutoMigrate(db); err != nil {
+		panic(err)
+	}
 	run_http_server()
 }
