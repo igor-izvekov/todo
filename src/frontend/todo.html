@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List - Мои задачи</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .user-info {
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logout-btn {
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.4);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .add-task-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .add-task-form input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .add-task-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .add-task-form button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        .add-task-form button:hover {
+            transform: translateY(-2px);
+        }
+
+        .task-list {
+            list-style: none;
+        }
+
+        .task-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s;
+        }
+
+        .task-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .task-item.completed {
+            opacity: 0.6;
+            background: #d1fae5;
+        }
+
+        .task-checkbox {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        .task-title {
+            flex: 1;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .task-item.completed .task-title {
+            text-decoration: line-through;
+            color: #6c757d;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .edit-btn, .delete-btn, .save-btn, .cancel-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .edit-btn {
+            background: #4caf50;
+            color: white;
+        }
+
+        .edit-btn:hover {
+            background: #45a049;
+        }
+
+        .delete-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: #da190b;
+        }
+
+        .save-btn {
+            background: #2196f3;
+            color: white;
+        }
+
+        .cancel-btn {
+            background: #9e9e9e;
+            color: white;
+        }
+
+        .edit-input {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .stats {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📝 Мои задачи</h1>
+            <div class="user-info">
+                <span id="userName"></span>
+                <button class="logout-btn" onclick="logout()">🚪 Выйти</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="add-task-form">
+                <input type="text" id="taskTitle" placeholder="Что нужно сделать?" onkeypress="handleEnter(event)">
+                <button onclick="createTask()">➕ Добавить задачу</button>
+            </div>
+
+            <div id="errorMessage" class="error"></div>
+
+            <div id="taskList" class="task-list">
+                <div class="loading">⏳ Загрузка задач...</div>
+            </div>
+
+            <div id="stats" class="stats"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080/api';
+        let currentUser = null;
+        let token = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            token = localStorage.getItem('token');
+            const userStr = localStorage.getItem('user');
+            
+            if (!token || !userStr) {
+                window.location.href = '/';
+                return;
+            }
+            
+            currentUser = JSON.parse(userStr);
+            document.getElementById('userName').textContent = currentUser.name || currentUser.email;
+            
+            loadTasks();
+        });
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+
+        async function loadTasks() {
+            showLoading();
+            hideError();
+
+            try {
+                const response = await fetch(`${API_URL}/tasks?userID=${currentUser.ID}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`Ошибка ${response.status}`);
+                }
+
+                const data = await response.json();
+                renderTasks(data.tasks || []);
+                updateStats(data.tasks || []);
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+                showError('Не удалось загрузить задачи: ' + error.message);
+                renderError();
+            }
+        }
+
+        async function createTask() {
+            const titleInput = document.getElementById('taskTitle');
+            const title = titleInput.value.trim();
+
+            if (!title) {
+                showError('Пожалуйста, введите название задачи');
+                return;
+            }
+
+            hideError();
+
+            try {
+                const response = await fetch(`${API_URL}/tasks`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        userID: currentUser.ID,
+                        title: title
+                    })
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Ошибка создания');
+                }
+
+                titleInput.value = '';
+                await loadTasks();
+            } catch (error) {
+                console.error('Ошибка создания:', error);
+                showError('Не удалось создать задачу: ' + error.message);
+            }
+        }
+
+        async function updateTask(taskId, newTitle) {
+            hideError();
+
+            try {
+                const response = await fetch(`${API_URL}/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        userID: currentUser.ID,
+                        title: newTitle
+                    })
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Ошибка обновления');
+                }
+
+                await loadTasks();
+            } catch (error) {
+                console.error('Ошибка обновления:', error);
+                showError('Не удалось обновить задачу: ' + error.message);
+            }
+        }
+
+        async function deleteTask(taskId) {
+            if (!confirm('Вы уверены, что хотите удалить эту задачу?')) {
+                return;
+            }
+
+            hideError();
+
+            try {
+                const response = await fetch(`${API_URL}/tasks/${taskId}?userID=${currentUser.ID}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Ошибка удаления');
+                }
+
+                await loadTasks();
+            } catch (error) {
+                console.error('Ошибка удаления:', error);
+                showError('Не удалось удалить задачу: ' + error.message);
+            }
+        }
+
+        async function completeTask(taskId, currentStatus) {
+            if (currentStatus) {
+                return;
+            }
+
+            hideError();
+
+            try {
+                const response = await fetch(`${API_URL}/tasks/${taskId}/complete?userID=${currentUser.ID}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Ошибка обновления статуса');
+                }
+
+                await loadTasks();
+            } catch (error) {
+                console.error('Ошибка завершения:', error);
+                showError('Не удалось отметить задачу: ' + error.message);
+            }
+        }
+
+        function renderTasks(tasks) {
+            const container = document.getElementById('taskList');
+            
+            if (!tasks || tasks.length === 0) {
+                container.innerHTML = '<div class="empty-state">✨ Нет задач. Добавьте первую!</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            
+            tasks.forEach(task => {
+                const taskElement = document.createElement('div');
+                taskElement.className = `task-item ${task.Completed ? 'completed' : ''}`;
+                taskElement.id = `task-${task.ID}`;
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'task-checkbox';
+                checkbox.checked = task.Completed;
+                checkbox.onchange = () => completeTask(task.ID, task.Completed);
+                
+                const titleSpan = document.createElement('span');
+                titleSpan.className = 'task-title';
+                titleSpan.textContent = task.Title;
+                
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'task-actions';
+                
+                const editBtn = document.createElement('button');
+                editBtn.className = 'edit-btn';
+                editBtn.textContent = '✏️';
+                editBtn.onclick = () => startEdit(task.ID, task.Title);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.onclick = () => deleteTask(task.ID);
+                
+                actionsDiv.appendChild(editBtn);
+                actionsDiv.appendChild(deleteBtn);
+                
+                taskElement.appendChild(checkbox);
+                taskElement.appendChild(titleSpan);
+                taskElement.appendChild(actionsDiv);
+                
+                container.appendChild(taskElement);
+            });
+        }
+
+        function startEdit(taskId, currentTitle) {
+            const taskElement = document.getElementById(`task-${taskId}`);
+            const titleSpan = taskElement.querySelector('.task-title');
+            const actionsDiv = taskElement.querySelector('.task-actions');
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'edit-input';
+            input.value = currentTitle;
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'save-btn';
+            saveBtn.textContent = '💾';
+            saveBtn.onclick = async () => {
+                const newTitle = input.value.trim();
+                if (newTitle && newTitle !== currentTitle) {
+                    await updateTask(taskId, newTitle);
+                } else if (!newTitle) {
+                    showError('Название задачи не может быть пустым');
+                } else {
+                    await loadTasks();
+                }
+            };
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'cancel-btn';
+            cancelBtn.textContent = '❌';
+            cancelBtn.onclick = () => loadTasks();
+            
+            titleSpan.replaceWith(input);
+            actionsDiv.innerHTML = '';
+            actionsDiv.appendChild(saveBtn);
+            actionsDiv.appendChild(cancelBtn);
+        }
+
+        function updateStats(tasks) {
+            const statsDiv = document.getElementById('stats');
+            const total = tasks.length;
+            const completed = tasks.filter(t => t.Completed).length;
+            const active = total - completed;
+            
+            statsDiv.innerHTML = `
+                Статистика: Всего: ${total} | 
+                Выполнено: ${completed} | 
+                Активных: ${active}
+            `;
+        }
+
+        function showLoading() {
+            document.getElementById('taskList').innerHTML = '<div class="loading">⏳ Загрузка задач...</div>';
+        }
+
+        function renderError() {
+            document.getElementById('taskList').innerHTML = '<div class="empty-state">❌ Ошибка загрузки задач</div>';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function hideError() {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.style.display = 'none';
+        }
+
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                createTask();
+            }
+        }
+    </script>
+</body>
+</html>

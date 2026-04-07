@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	http_server = "localhost:8000"
+	http_server = "localhost:8080"
 )
 
 func run_http_server() {
@@ -19,24 +19,32 @@ func run_http_server() {
 	gin.SetMode(gin.ReleaseMode)
 	router.Use(gin.Logger())
 
-	router.LoadHTMLGlob("frontend/" + "*.html")
-	router.Static("frontend/", "styles.css")
+	router.LoadHTMLGlob("frontend/*.html")
 
-	taskGroup := router.Group("/tasks")
+	router.GET("/", func(c *gin.Context) {
+		c.HTML(200, "index.html", nil)
+	})
+	router.GET("/todo", func(c *gin.Context) {
+		c.HTML(200, "todo.html", nil)
+	})
 
+	api := router.Group("/api")
 	{
-		taskGroup.POST("/", handlers.CreateTask)
-		taskGroup.GET("/", handlers.GetTasks)
-		taskGroup.GET("/:id", handlers.GetTask)
-		taskGroup.PUT("/:id", handlers.UpdateTask)
-		taskGroup.DELETE("/:id", handlers.DeleteTask)
-		taskGroup.PATCH("/:id/complete", handlers.CompleteTask)
+		api.POST("/auth/login", auth.HandleLoginOrRegister)
+
+		taskGroup := api.Group("/tasks")
+		taskGroup.Use(auth.AuthMiddleware())
+		{
+			taskGroup.POST("/", handlers.CreateTask)
+			taskGroup.GET("/", handlers.GetTasks)
+			taskGroup.GET("/:id", handlers.GetTask)
+			taskGroup.PUT("/:id", handlers.UpdateTask)
+			taskGroup.DELETE("/:id", handlers.DeleteTask)
+			taskGroup.PATCH("/:id/complete", handlers.CompleteTask)
+		}
 	}
 
-	router.GET("/", auth.HandleHome)
-	router.GET("/login", auth.HandleLogin)
-	router.GET("/auth/callback", auth.HandleCallback)
-
+	log.Printf("Сервер запущен на http://%s", http_server)
 	if err := router.Run(http_server); err != nil {
 		log.Fatal("Failed to run server:", err)
 	}
@@ -44,12 +52,13 @@ func run_http_server() {
 
 func main() {
 	if err := database.Connect("todo.db"); err != nil {
-		panic(err)
+		panic("Ошибка подключения к БД: " + err.Error())
 	}
 
 	db := database.GetDB()
 	if err := migrations.AutoMigrate(db); err != nil {
-		panic(err)
+		panic("Ошибка миграции: " + err.Error())
 	}
+
 	run_http_server()
 }

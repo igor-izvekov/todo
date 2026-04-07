@@ -1,127 +1,121 @@
 package auth
 
 import (
-	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/json"
 	"log"
 	"net/http"
-	"os/exec"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/igor-izvekov/todo/pkg/database"
+	"github.com/igor-izvekov/todo/pkg/models"
 )
 
-var (
-	oauthConf = &oauth2.Config{
-		ClientID:     "ВАШ_CLIENT_ID.apps.googleusercontent.com",
-		ClientSecret: "ВАШ_CLIENT_SECRET",
-		RedirectURL:  "http://localhost:8080/auth/callback",
-		Scopes: []string{
-			"https://www.googleapis.com/auth/userinfo.email",
-			"https://www.googleapis.com/auth/userinfo.profile",
-		},
-		Endpoint: google.Endpoint,
-	}
-	state = generateStateOauthCookie()
-)
+var jwtSecret = []byte("todo-app-secret-key-2024") // В реальном проекте вынесите в .env
 
-func generateStateOauthCookie() string {
-	b := make([]byte, 32)
-	rand.Read(b)
-	return base64.StdEncoding.EncodeToString(b)
+type LoginRequest struct {
+	Email string `json:"email" binding:"required,email"`
 }
 
-type UserInfo struct {
-	ID            string `json:"id"`
-	Email         string `json:"email"`
-	VerifiedEmail bool   `json:"verified_email"`
-	Name          string `json:"name"`
-	GivenName     string `json:"given_name"`
-	FamilyName    string `json:"family_name"`
-	Picture       string `json:"picture"`
-	Locale        string `json:"locale"`
+type LoginResponse struct {
+	Token string      `json:"token"`
+	User  models.User `json:"user"`
 }
 
-func HandleLogin(c *gin.Context) {
-	url := oauthConf.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
-	c.Redirect(http.StatusTemporaryRedirect, url)
-}
+func HandleLoginOrRegister(c *gin.Context) {
+	var req LoginRequest
 
-func HandleCallback(c *gin.Context) {
-	// Проверяем state для защиты от CSRF
-	if c.Query("state") != state {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state"})
-		log.Println("State mismatch")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный email: " + err.Error()})
 		return
 	}
 
-	code := c.Query("code")
-	if code == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Code not found"})
-		return
-	}
+	db := database.GetDB()
+	var user models.User
 
-	ctx := context.Background()
-	token, err := oauthConf.Exchange(ctx, code)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange token"})
-		log.Printf("Token exchange error: %v", err)
-		return
-	}
+	result := db.Where("email = ?", req.Email).First(&user)
 
-	client := oauthConf.Client(ctx, token)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user info"})
-		log.Printf("User info error: %v", err)
-		return
-	}
-	defer resp.Body.Close()
+	if result.Error != nil {
+		user = models.User{
+			Email: req.Email,
+		}
 
-	var userInfo UserInfo
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse user info"})
-		log.Printf("Parse error: %v", err)
-		return
-	}
-
-	log.Printf("User logged in: %s (%s)", userInfo.Name, userInfo.Email)
-
-	c.HTML(http.StatusOK, "success.html", gin.H{
-		"user": userInfo,
-	})
-}
-
-func HandleHome(c *gin.Context) {
-	c.HTML(http.StatusOK, "index.html", gin.H{
-		"title": "Go OAuth2 with Google",
-	})
-}
-
-func OpenBrowser(url string) {
-	commands := []struct {
-		cmd  string
-		args []string
-	}{
-		{"cmd", []string{"/c", "start", "chrome", url}},
-		{"cmd", []string{"/c", "start", url}},
-		{"open", []string{"-a", "Google Chrome", url}},
-		{"open", []string{url}},
-		{"google-chrome", []string{url}},
-		{"google-chrome-stable", []string{url}},
-		{"chromium-browser", []string{url}},
-		{"xdg-open", []string{url}},
-	}
-
-	for _, cmd := range commands {
-		err := exec.Command(cmd.cmd, cmd.args...).Start()
-		if err == nil {
-			log.Printf("Browser opened with: %s %v", cmd.cmd, cmd.args)
+		if err := db.Create(&user).Error; err != nil {
+			log.Printf("Ошибка создания пользователя: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать пользователя"})
 			return
 		}
+
+		log.Printf("Создан новый пользователь: %s (%s)", user.Email)
+	} else {
+		log.Printf("Существующий пользователь вошёл: %s (%s)", user.Email)
 	}
-	log.Println("Could not open browser automatically, please visit http://localhost:8080")
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": user.ID,
+		"email":   user.Email,
+	})
+
+	tokenString, err := token.SignedString(jwtSecret)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка генерации токена"})
+		return
+	}
+
+	c.JSON(http.StatusOK, LoginResponse{
+		Token: tokenString,
+		User:  user,
+	})
+}
+
+func AuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString := c.GetHeader("Authorization")
+		if tokenString == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+			c.Abort()
+			return
+		}
+
+		if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
+			tokenString = tokenString[7:]
+		}
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			return jwtSecret, nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный токен"})
+			c.Abort()
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный токен"})
+			c.Abort()
+			return
+		}
+
+		c.Set("user_id", claims["user_id"])
+		c.Set("email", claims["email"])
+
+		c.Next()
+	}
+}
+
+func GetUserID(c *gin.Context) int {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		return 0
+	}
+
+	switch v := userID.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	default:
+		return 0
+	}
 }

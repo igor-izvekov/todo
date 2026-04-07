@@ -5,12 +5,9 @@ import (
 )
 
 type User struct {
-	ID        int    `gorm:"primaryKey"` // Google ID (sub)
-	Email     string `gorm:"uniqueIndex;not null"`
-	Name      string
-	AvatarURL string
-	CreatedAt time.Time
-	Tasks     []Task `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	ID    int    `gorm:"primaryKey"`
+	Email string `gorm:"uniqueIndex;not null"`
+	Tasks []Task `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 }
 
 type Task struct {
