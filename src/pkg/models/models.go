@@ -5,7 +5,7 @@ import (
 )
 
 type User struct {
-	ID        string `gorm:"primaryKey"` // Google ID (sub)
+	ID        int    `gorm:"primaryKey"` // Google ID (sub)
 	Email     string `gorm:"uniqueIndex;not null"`
 	Name      string
 	AvatarURL string
@@ -14,8 +14,8 @@ type User struct {
 }
 
 type Task struct {
-	ID        uint   `gorm:"primaryKey"`
-	UserID    string `gorm:"index;not null"`
+	ID        int    `gorm:"primaryKey"`
+	UserID    int    `gorm:"index;not null"`
 	Title     string `gorm:"not null"`
 	Completed bool   `gorm:"default:false"`
 	CreatedAt time.Time

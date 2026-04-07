@@ -1,11 +1,12 @@
 package main
 
 import (
-	"net/http"
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/igor-izvekov/todo/pkg/auth"
 	"github.com/igor-izvekov/todo/pkg/database"
+	"github.com/igor-izvekov/todo/pkg/handlers"
 	"github.com/igor-izvekov/todo/pkg/migrations"
 )
 
@@ -19,10 +20,7 @@ func run_http_server() {
 	router.Use(gin.Logger())
 
 	router.LoadHTMLGlob("frontend/" + "*.html")
-
-	router.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", gin.H{})
-	})
+	router.Static("frontend/", "styles.css")
 
 	taskGroup := router.Group("/tasks")
 
@@ -34,6 +32,10 @@ func run_http_server() {
 		taskGroup.DELETE("/:id", handlers.DeleteTask)
 		taskGroup.PATCH("/:id/complete", handlers.CompleteTask)
 	}
+
+	router.GET("/", auth.HandleHome)
+	router.GET("/login", auth.HandleLogin)
+	router.GET("/auth/callback", auth.HandleCallback)
 
 	if err := router.Run(http_server); err != nil {
 		log.Fatal("Failed to run server:", err)
