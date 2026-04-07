@@ -10,7 +10,7 @@ import (
 	"github.com/igor-izvekov/todo/pkg/models"
 )
 
-var jwtSecret = []byte("todo-app-secret-key-2024") // В реальном проекте вынесите в .env
+var jwtSecret = []byte("todo-app-secret-key-2026") // В реальном проекте вынесите в .env
 
 type LoginRequest struct {
 	Email string `json:"email" binding:"required,email"`
